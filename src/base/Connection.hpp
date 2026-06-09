@@ -53,6 +53,21 @@ class Connection {
 
   inline bool isDisconnected() { return socketFd == -1; }
 
+  /**
+   * @brief Returns true when writePacket() of `bytes` more will not block:
+   * either the socket is connected or the disconnect buffer has room.
+   * Callers can use this to apply backpressure at the source instead of
+   * blocking inside writePacket() while the remote end is disconnected.
+   */
+  inline bool canBufferWrite(int64_t bytes) {
+    lock_guard<std::recursive_mutex> guard(connectionMutex);
+    if (shuttingDown) {
+      // writePacket() returns immediately when shutting down.
+      return true;
+    }
+    return writer && writer->hasBufferCapacity(bytes);
+  }
+
   inline string getId() { return id; }
 
   inline bool hasData() { return reader->hasData(); }

@@ -87,6 +87,13 @@ void SocketHandler::writeAllOrThrow(int fd, const void* buf, size_t count,
         LOG(INFO) << "Got EAGAIN, waiting...";
         // This is fine, just keep retrying at 10hz
         std::this_thread::sleep_for(std::chrono::microseconds(100 * 1000));
+      } else if (!timeout && localErrno == ETIMEDOUT) {
+        // macOS surfaces ETIMEDOUT on unix sockets whose peer has stopped
+        // draining for a long time even though the connection is intact.
+        // Callers that asked for infinite patience shouldn't die from it;
+        // if the peer is really gone the next attempt fails with EPIPE.
+        LOG_EVERY_N(100, WARNING) << "Got ETIMEDOUT, retrying...";
+        std::this_thread::sleep_for(std::chrono::microseconds(100 * 1000));
       } else {
         LOG(WARNING) << "Failed a call to writeAll: " << strerror(localErrno);
         throw std::runtime_error("Failed a call to writeAll");

@@ -136,8 +136,16 @@ void TerminalServer::runJumpHost(
     timeval tv;
 
     FD_ZERO(&rfd);
-    FD_SET(terminalFd, &rfd);
-    int maxfd = terminalFd;
+    int maxfd = -1;
+    // Only drain the terminal while the client connection can absorb the
+    // data.  When the client is disconnected and the disconnect buffer is
+    // full, leave the data in the pipe so backpressure propagates to the
+    // terminal instead of this loop blocking inside writePacket(), which
+    // would stall the session until the client reconnects.
+    if (serverClientState->canBufferWrite(2 * BUF_SIZE)) {
+      FD_SET(terminalFd, &rfd);
+      maxfd = terminalFd;
+    }
     int serverClientFd = serverClientState->getSocketFd();
     if (serverClientFd > 0) {
       FD_SET(serverClientFd, &rfd);
@@ -280,8 +288,16 @@ void TerminalServer::runTerminal(
     timeval tv;
 
     FD_ZERO(&rfd);
-    FD_SET(terminalFd, &rfd);
-    int maxfd = terminalFd;
+    int maxfd = -1;
+    // Only drain the terminal while the client connection can absorb the
+    // data.  When the client is disconnected and the disconnect buffer is
+    // full, leave the data in the pty so backpressure propagates to the
+    // shell instead of this loop blocking inside writePacket(), which
+    // would stall the session until the client reconnects.
+    if (serverClientState->canBufferWrite(2 * BUF_SIZE)) {
+      FD_SET(terminalFd, &rfd);
+      maxfd = terminalFd;
+    }
     int serverClientFd = serverClientState->getSocketFd();
     if (serverClientFd > 0) {
       FD_SET(serverClientFd, &rfd);
